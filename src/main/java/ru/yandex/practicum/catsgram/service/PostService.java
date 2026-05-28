@@ -6,9 +6,7 @@ import ru.yandex.practicum.catsgram.exception.ConditionsNotMetException;
 import ru.yandex.practicum.catsgram.exception.NotFoundException;
 import ru.yandex.practicum.catsgram.model.Post;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 // Указываем, что класс PostService - является бином и его
 // нужно добавить в контекст приложения
@@ -16,14 +14,44 @@ import java.util.Map;
 public class PostService {
     private final Map<Long, Post> posts = new HashMap<>();
     private final UserService userService;
+    private Long currentMaxId;
+    private static final Long TEN_NEW_POSTS = 10L;
 
     @Autowired
     public PostService(UserService userService) {
         this.userService = userService;
     }
 
-    public Collection<Post> findAll() {
+    public Collection<Post> findAll(Integer from, Integer size, SortOrder sort) {
+        Map<Long, Post> posts = new LinkedHashMap<>();
+        if (sort == null) {
+            throw  new ConditionsNotMetException("Sort should be asc or desc");
+        }
+        if (size == null || size <= 0) {
+            throw new ConditionsNotMetException("Size should be greater than 0");
+        }
+        if (from == null || from < 0) {
+            throw new ConditionsNotMetException("From should be greater than or equal to 0");
+        }
+        Map<Long, Post> sortedPosts = sortPosts(sort);
+        size = sortedPosts.size() <= size ? sortedPosts.size() : size;
+        int count = 0;
+        int index = 0;
+        for (Long id : sortedPosts.keySet()) {
+            if (index++ < from) {
+                continue;
+            }
+            posts.put(id, sortedPosts.get(id));
+            count++;
+            if (count == size) {
+                break;
+            }
+        }
         return posts.values();
+    }
+
+    public Optional<Post> findPostsById(Long id) {
+        return Optional.ofNullable(posts.get(id));
     }
 
     public Post create(Post post) {
@@ -54,12 +82,24 @@ public class PostService {
         throw new NotFoundException("Пост с id = " + newPost.getId() + " не найден");
     }
 
+    public Map<Long, Post> sortPosts(SortOrder sort) {
+        if (SortOrder.ASCENDING.equals(sort)) {
+            return new TreeMap<>(posts);
+        } else {
+            Map<Long, Post> reversePosts = new TreeMap<>(Collections.reverseOrder());
+            reversePosts.putAll(posts);
+            return reversePosts;
+        }
+    }
+
     private long getNextId() {
-        long currentMaxId = posts.keySet()
-                .stream()
-                .mapToLong(id -> id)
-                .max()
-                .orElse(0);
+        if (currentMaxId == null) {
+            currentMaxId = posts.keySet()
+                    .stream()
+                    .mapToLong(id -> id)
+                    .max()
+                    .orElse(0);
+        }
         return ++currentMaxId;
     }
 }

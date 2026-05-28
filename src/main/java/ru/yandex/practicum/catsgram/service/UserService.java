@@ -19,6 +19,10 @@ public class UserService {
         return users.values();
     }
 
+    public Optional<User> getUserById(Long id) {
+        return Optional.ofNullable(users.get(id));
+    }
+
     public User createUser(User newUser) {
         if (newUser.getUsername() == null || newUser.getUsername().isBlank()) {
             throw new ConditionsNotMetException("Имя пользователя не может быть пустым");
